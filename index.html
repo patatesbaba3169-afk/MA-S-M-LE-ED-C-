@@ -1,0 +1,1462 @@
+```html
+<!DOCTYPE html>
+<html lang="tr" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pro Maç Simülatörü | 10 Seviyeli Futbol Motoru</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Google Fonts: Inter & Oswald (Skor tabelası estetiği için) -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Oswald:wght@600;700&display=swap" rel="stylesheet">
+    
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                        display: ['Oswald', 'sans-serif'],
+                    },
+                    colors: {
+                        pitch: {
+                            950: '#070b14',
+                            900: '#0d1322',
+                            800: '#151f36',
+                            700: '#1e2c4a',
+                        }
+                    },
+                    animation: {
+                        'fade-in-up': 'fadeInUp 0.45s cubic-bezier(0.16, 1, 0.3, 1) forwards',
+                        'pulse-slow': 'pulse 3s cubic-bezier(0.4, 0, 0.6, 1) infinite',
+                    },
+                    keyframes: {
+                        fadeInUp: {
+                            '0%': { opacity: '0', transform: 'translateY(14px)' },
+                            '100%': { opacity: '1', transform: 'translateY(0)' },
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        /* Özel kaydırma çubuğu ve ince broadcast detayları */
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #070b14;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #1e2c4a;
+            border-radius: 9999px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #2f436e;
+        }
+
+        .broadcast-grid-bg {
+            background-image: 
+                radial-gradient(circle at 50% 0%, rgba(56, 189, 248, 0.08) 0%, transparent 55%),
+                linear-gradient(to right, rgba(255, 255, 255, 0.02) 1px, transparent 1px),
+                linear-gradient(to bottom, rgba(255, 255, 255, 0.02) 1px, transparent 1px);
+            background-size: 100% 100%, 32px 32px, 32px 32px;
+        }
+
+        /* Dokunmatik cihazlarda hızlı tepki için */
+        button {
+            touch-action: manipulation;
+        }
+    </style>
+</head>
+<body class="bg-pitch-950 text-slate-100 min-h-screen broadcast-grid-bg antialiased selection:bg-sky-500/30 selection:text-sky-200">
+
+    <!-- Bildirim Toast Kutusu (alert() yerine) -->
+    <div id="toast-container" class="fixed bottom-5 right-5 z-50 flex flex-col gap-2 pointer-events-none"></div>
+
+    <!-- Üst Broadcast Header -->
+    <header class="border-b border-slate-800/80 bg-pitch-900/80 backdrop-blur-md sticky top-0 z-30">
+        <div class="max-w-5xl mx-auto px-4 py-3.5 flex items-center justify-between">
+            <div class="flex items-center gap-3">
+                <div class="w-9 h-9 rounded-xl bg-gradient-to-br from-emerald-500 to-teal-700 flex items-center justify-center shadow-lg shadow-emerald-950/50 border border-emerald-400/20">
+                    <!-- Futbol Topu SVG İkonu -->
+                    <svg class="w-5 h-5 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <circle cx="12" cy="12" r="10"/>
+                        <polygon points="12 7 16.5 10.5 14.8 16 9.2 16 7.5 10.5 12 7"/>
+                        <line x1="12" y1="2" x2="12" y2="7"/>
+                        <line x1="21.5" y1="9" x2="16.5" y2="10.5"/>
+                        <line x1="18" y1="20" x2="14.8" y2="16"/>
+                        <line x1="6" y1="20" x2="9.2" y2="16"/>
+                        <line x1="2.5" y1="9" x2="7.5" y2="10.5"/>
+                    </svg>
+                </div>
+                <div>
+                    <div class="flex items-center gap-2">
+                        <h1 class="font-display text-lg sm:text-xl tracking-wide uppercase font-bold text-white leading-none">
+                            PRO MAÇ SİMÜLATÖRÜ
+                        </h1>
+                        <span class="px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider rounded-full bg-emerald-500/15 text-emerald-400 border border-emerald-500/30">
+                            CANLI MOTOR v2.6
+                        </span>
+                    </div>
+                    <p class="text-xs text-slate-400 mt-0.5">10 Seviyeli Güç Dengesi & Detaylı Maç Analizi</p>
+                </div>
+            </div>
+
+            <button onclick="resetAll()" title="Sıfırla" class="text-xs font-medium text-slate-400 hover:text-white bg-slate-800/70 hover:bg-slate-800 border border-slate-700/70 px-3 py-2 rounded-xl transition flex items-center gap-1.5">
+                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                </svg>
+                <span class="hidden sm:inline">Sıfırla</span>
+            </button>
+        </div>
+    </header>
+
+    <main class="max-w-5xl mx-auto px-4 py-6 sm:py-8 space-y-6">
+
+        <!-- 1. BÖLÜM: TAKIM GÜÇ SEVİYELERİ & MAÇ AYARLARI PANELİ -->
+        <section class="bg-pitch-900/90 border border-slate-800 rounded-2xl p-4 sm:p-6 shadow-2xl">
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                
+                <!-- EV SAHİBİ TAKIM KARTI (Sabit İsim & Logo) -->
+                <div class="bg-gradient-to-b from-blue-950/40 to-pitch-800/60 border border-blue-500/25 rounded-2xl p-4 sm:p-5 relative overflow-hidden">
+                    <div class="absolute -right-6 -top-6 w-28 h-28 bg-blue-500/10 rounded-full blur-2xl pointer-events-none"></div>
+                    
+                    <div class="flex items-center justify-between gap-3 mb-4">
+                        <div class="flex items-center gap-3.5">
+                            <!-- Sabit Ev Sahibi Kalkan Logosu -->
+                            <div class="w-14 h-14 rounded-2xl bg-gradient-to-br from-blue-600 to-indigo-900 p-0.5 shadow-lg shadow-blue-950/60 flex-shrink-0">
+                                <div class="w-full h-full bg-pitch-950/60 rounded-[14px] flex items-center justify-center">
+                                    <svg class="w-8 h-8 text-blue-400" viewBox="0 0 24 24" fill="currentColor">
+                                        <path d="M12 2L4 5v6.09c0 5.05 3.41 9.76 8 10.91 4.59-1.15 8-5.86 8-10.91V5l-8-3zm0 2.18l6 2.25v4.66c0 4.01-2.56 7.77-6 8.83-3.44-1.06-6-4.82-6-8.83V6.43l6-2.25z"/>
+                                        <path d="M11 7h2v10h-2z" opacity="0.8"/>
+                                    </svg>
+                                </div>
+                            </div>
+                            <div>
+                                <span class="text-[11px] font-bold uppercase tracking-widest text-blue-400 block">İÇ SAHA AVANTAJI</span>
+                                <h2 class="text-lg sm:text-xl font-extrabold text-white tracking-tight">Ev Sahibi Takım</h2>
+                                <div id="home-tier-badge" class="inline-flex items-center gap-1.5 mt-1 px-2.5 py-0.5 rounded-lg text-xs font-semibold bg-blue-500/20 text-blue-200 border border-blue-400/30">
+                                    Seviye 7 • Şampiyonluk Adayı
+                                </div>
+                            </div>
+                        </div>
+                        <div class="text-right">
+                            <span class="text-[11px] text-slate-400 block uppercase font-semibold">Güç</span>
+                            <span id="home-power-display" class="font-display text-3xl sm:text-4xl font-bold text-blue-400">7</span>
+                            <span class="text-xs text-slate-500 font-bold">/10</span>
+                        </div>
+                    </div>
+
+                    <!-- 1-10 Seviye Seçici Butonlar -->
+                    <div class="space-y-2">
+                        <div class="flex justify-between text-[11px] text-slate-400 font-medium px-0.5">
+                            <span>1 (Amatör)</span>
+                            <span>5 (Orta)</span>
+                            <span>10 (Dünya Devi)</span>
+                        </div>
+                        <div id="home-level-buttons" class="grid grid-cols-10 gap-1 sm:gap-1.5">
+                            <!-- JS ile 1-10 arası butonlar üretilecek -->
+                        </div>
+                    </div>
+                </div>
+
+                <!-- DEPLASMAN TAKIMI KARTI (Sabit İsim & Logo) -->
+                <div class="bg-gradient-to-b from-rose-950/40 to-pitch-800/60 border border-rose-500/25 rounded-2xl p-4 sm:p-5 relative overflow-hidden">
+                    <div class="absolute -right-6 -top-6 w-28 h-28 bg-rose-500/10 rounded-full blur-2xl pointer-events-none"></div>
+                    
+                    <div class="flex items-center justify-between gap-3 mb-4">
+                        <div class="flex items-center gap-3.5">
+                            <!-- Sabit Deplasman Kalkan Logosu -->
+                            <div class="w-14 h-14 rounded-2xl bg-gradient-to-br from-rose-600 to-red-950 p-0.5 shadow-lg shadow-rose-950/60 flex-shrink-0">
+                                <div class="w-full h-full bg-pitch-950/60 rounded-[14px] flex items-center justify-center">
+                                    <svg class="w-8 h-8 text-rose-400" viewBox="0 0 24 24" fill="currentColor">
+                                        <path d="M12 2L4 5v6.09c0 5.05 3.41 9.76 8 10.91 4.59-1.15 8-5.86 8-10.91V5l-8-3zm0 2.18l6 2.25v4.66c0 4.01-2.56 7.77-6 8.83-3.44-1.06-6-4.82-6-8.83V6.43l6-2.25z"/>
+                                        <path d="M7 10l5 4 5-4v2.5l-5 4-5-4V10z" opacity="0.85"/>
+                                    </svg>
+                                </div>
+                            </div>
+                            <div>
+                                <span class="text-[11px] font-bold uppercase tracking-widest text-rose-400 block">KONUK EKİP</span>
+                                <h2 class="text-lg sm:text-xl font-extrabold text-white tracking-tight">Deplasman Takımı</h2>
+                                <div id="away-tier-badge" class="inline-flex items-center gap-1.5 mt-1 px-2.5 py-0.5 rounded-lg text-xs font-semibold bg-rose-500/20 text-rose-200 border border-rose-400/30">
+                                    Seviye 6 • Üst Sıra Zorlayıcısı
+                                </div>
+                            </div>
+                        </div>
+                        <div class="text-right">
+                            <span class="text-[11px] text-slate-400 block uppercase font-semibold">Güç</span>
+                            <span id="away-power-display" class="font-display text-3xl sm:text-4xl font-bold text-rose-400">6</span>
+                            <span class="text-xs text-slate-500 font-bold">/10</span>
+                        </div>
+                    </div>
+
+                    <!-- 1-10 Seviye Seçici Butonlar -->
+                    <div class="space-y-2">
+                        <div class="flex justify-between text-[11px] text-slate-400 font-medium px-0.5">
+                            <span>1 (Amatör)</span>
+                            <span>5 (Orta)</span>
+                            <span>10 (Dünya Devi)</span>
+                        </div>
+                        <div id="away-level-buttons" class="grid grid-cols-10 gap-1 sm:gap-1.5">
+                            <!-- JS ile 1-10 arası butonlar üretilecek -->
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+
+            <!-- Maç Formatı Seçimi & Direkt Simüle Et Butonu -->
+            <div class="mt-6 pt-5 border-t border-slate-800/90 flex flex-col md:flex-row items-stretch md:items-center justify-between gap-4">
+                
+                <!-- Maç Formatı (Normal vs Eleme Usulü) -->
+                <div class="flex flex-col sm:flex-row sm:items-center gap-2.5">
+                    <span class="text-xs font-bold uppercase tracking-wider text-slate-400">Maç Formatı:</span>
+                    <div class="grid grid-cols-2 bg-pitch-950 p-1 rounded-xl border border-slate-800">
+                        <button type="button" id="mode-normal" onclick="setMatchMode('normal')" class="px-3.5 py-2 rounded-lg text-xs sm:text-sm font-semibold transition flex items-center justify-center gap-1.5 bg-slate-800 text-white shadow">
+                            <span>⚽</span>
+                            <span>Normal Maç (90 Dk)</span>
+                        </button>
+                        <button type="button" id="mode-knockout" onclick="setMatchMode('knockout')" class="px-3.5 py-2 rounded-lg text-xs sm:text-sm font-semibold transition flex items-center justify-center gap-1.5 text-slate-400 hover:text-slate-200">
+                            <span>🏆</span>
+                            <span>Eleme Usulü (Uzatma & Penaltı)</span>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Direkt Simüle Et Aksiyon Butonu -->
+                <button type="button" onclick="simulateMatch()" class="group relative overflow-hidden bg-gradient-to-r from-emerald-500 via-teal-500 to-emerald-600 hover:from-emerald-400 hover:to-teal-400 text-slate-950 font-extrabold text-sm sm:text-base px-7 py-3.5 rounded-xl shadow-lg shadow-emerald-950/60 transition-all active:scale-[0.98] flex items-center justify-center gap-2.5 cursor-pointer">
+                    <svg class="w-5 h-5 transition-transform group-hover:translate-x-0.5" fill="currentColor" viewBox="0 0 24 24">
+                        <path d="M8 5v14l11-7z"/>
+                    </svg>
+                    <span>MAÇI DİREKT SİMÜLE ET</span>
+                </button>
+            </div>
+        </section>
+
+        <!-- 2. BÖLÜM: MAÇ SONUCU, SKORBORD, PENALTILAR, İSTATİSTİKLER VE OLAY AKIŞI (Simülasyon sonrası görünür) -->
+        <div id="results-wrapper" class="hidden space-y-6">
+
+            <!-- SKORBORD KARTI (TV Yayın Grafiği Tarzı) -->
+            <section id="scoreboard-section" class="bg-gradient-to-b from-pitch-800 to-pitch-900 border border-slate-700/80 rounded-2xl overflow-hidden shadow-2xl animate-fade-in-up">
+                <!-- Üst Bilgi Şeridi -->
+                <div class="bg-pitch-950/90 px-4 py-2.5 border-b border-slate-800 flex flex-wrap items-center justify-between gap-2 text-xs">
+                    <div class="flex items-center gap-2">
+                        <span class="w-2 h-2 rounded-full bg-emerald-400"></span>
+                        <span id="match-status-label" class="font-bold uppercase tracking-wider text-emerald-400">MAÇ SONUCU • 90 DAKİKA</span>
+                    </div>
+                    <div id="match-summary-badge" class="text-slate-400 font-medium">
+                        Güç Dengesi: 7 vs 6
+                    </div>
+                </div>
+
+                <!-- Ana Skor Alanı -->
+                <div class="p-5 sm:p-8">
+                    <div class="grid grid-cols-3 items-center gap-2 sm:gap-6">
+                        
+                        <!-- Ev Sahibi -->
+                        <div class="flex flex-col items-center text-center">
+                            <div class="w-14 h-14 sm:w-20 sm:h-20 rounded-2xl bg-gradient-to-br from-blue-600 to-indigo-900 p-0.5 shadow-xl mb-2.5">
+                                <div class="w-full h-full bg-pitch-950/65 rounded-[14px] flex items-center justify-center">
+                                    <svg class="w-8 h-8 sm:w-11 sm:h-11 text-blue-400" viewBox="0 0 24 24" fill="currentColor">
+                                        <path d="M12 2L4 5v6.09c0 5.05 3.41 9.76 8 10.91 4.59-1.15 8-5.86 8-10.91V5l-8-3zm0 2.18l6 2.25v4.66c0 4.01-2.56 7.77-6 8.83-3.44-1.06-6-4.82-6-8.83V6.43l6-2.25z"/>
+                                        <path d="M11 7h2v10h-2z" opacity="0.8"/>
+                                    </svg>
+                                </div>
+                            </div>
+                            <h3 class="font-bold text-sm sm:text-lg text-white leading-tight">Ev Sahibi Takım</h3>
+                            <span id="score-home-level" class="text-[11px] font-semibold text-blue-400 mt-0.5">Seviye 7</span>
+                            <!-- Ev Sahibi Gol Atanlar Özeti -->
+                            <div id="home-scorers-list" class="mt-3 space-y-1 text-[11px] sm:text-xs text-slate-300"></div>
+                        </div>
+
+                        <!-- Orta Skor Rakamları -->
+                        <div class="flex flex-col items-center justify-center">
+                            <div class="bg-pitch-950/90 border border-slate-700/80 px-4 sm:px-8 py-3 sm:py-4 rounded-2xl shadow-inner flex items-center gap-3 sm:gap-5">
+                                <span id="final-home-score" class="font-display text-4xl sm:text-6xl font-bold text-white">0</span>
+                                <span class="font-display text-2xl sm:text-4xl font-bold text-slate-600">-</span>
+                                <span id="final-away-score" class="font-display text-4xl sm:text-6xl font-bold text-white">0</span>
+                            </div>
+
+                            <!-- İlk Yarı / 90 Dk / Penaltı Alt Bilgileri -->
+                            <div class="mt-2.5 text-center space-y-1">
+                                <div id="halftime-score-text" class="text-xs font-medium text-slate-400">İlk Yarı: 0 - 0</div>
+                                <div id="extratime-score-text" class="hidden text-xs font-semibold text-amber-400">90 Dk Sonucu: 0 - 0</div>
+                                <div id="penalty-score-badge" class="hidden inline-block px-3 py-1 rounded-full bg-amber-500/20 border border-amber-500/40 text-amber-300 text-xs font-bold">
+                                    Penaltılar: 0 - 0
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Deplasman -->
+                        <div class="flex flex-col items-center text-center">
+                            <div class="w-14 h-14 sm:w-20 sm:h-20 rounded-2xl bg-gradient-to-br from-rose-600 to-red-950 p-0.5 shadow-xl mb-2.5">
+                                <div class="w-full h-full bg-pitch-950/65 rounded-[14px] flex items-center justify-center">
+                                    <svg class="w-8 h-8 sm:w-11 sm:h-11 text-rose-400" viewBox="0 0 24 24" fill="currentColor">
+                                        <path d="M12 2L4 5v6.09c0 5.05 3.41 9.76 8 10.91 4.59-1.15 8-5.86 8-10.91V5l-8-3zm0 2.18l6 2.25v4.66c0 4.01-2.56 7.77-6 8.83-3.44-1.06-6-4.82-6-8.83V6.43l6-2.25z"/>
+                                        <path d="M7 10l5 4 5-4v2.5l-5 4-5-4V10z" opacity="0.85"/>
+                                    </svg>
+                                </div>
+                            </div>
+                            <h3 class="font-bold text-sm sm:text-lg text-white leading-tight">Deplasman Takımı</h3>
+                            <span id="score-away-level" class="text-[11px] font-semibold text-rose-400 mt-0.5">Seviye 6</span>
+                            <!-- Deplasman Gol Atanlar Özeti -->
+                            <div id="away-scorers-list" class="mt-3 space-y-1 text-[11px] sm:text-xs text-slate-300"></div>
+                        </div>
+
+                    </div>
+                </div>
+            </section>
+
+            <!-- PENALTI ATIŞLARI TABLOSU (Sadece Penaltılara Gidildiyse Görünür) -->
+            <section id="penalty-shootout-section" class="hidden bg-pitch-900 border border-amber-500/30 rounded-2xl p-4 sm:p-6 shadow-xl animate-fade-in-up">
+                <div class="flex flex-wrap items-center justify-between gap-2 pb-4 mb-4 border-b border-slate-800">
+                    <div class="flex items-center gap-2.5">
+                        <span class="text-xl">🎯</span>
+                        <div>
+                            <h3 class="font-bold text-base sm:text-lg text-white">Seri Penaltı Atışları Tablosu</h3>
+                            <p class="text-xs text-slate-400">120 dakikanın ardından turu geçen tarafı belirleyen vuruşlar</p>
+                        </div>
+                    </div>
+                    <div id="penalty-winner-banner" class="px-3.5 py-1.5 rounded-xl bg-amber-500/15 border border-amber-500/30 text-amber-300 text-xs sm:text-sm font-bold">
+                        Penaltılarla Kazanan: Ev Sahibi Takım
+                    </div>
+                </div>
+
+                <!-- Görsel Penaltı Noktaları Özeti -->
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-5">
+                    <div class="bg-pitch-950/80 border border-blue-500/20 rounded-xl p-3.5 flex items-center justify-between">
+                        <span class="text-xs sm:text-sm font-bold text-blue-400">Ev Sahibi Takım</span>
+                        <div id="home-penalty-dots" class="flex flex-wrap items-center gap-1.5"></div>
+                    </div>
+                    <div class="bg-pitch-950/80 border border-rose-500/20 rounded-xl p-3.5 flex items-center justify-between">
+                        <span class="text-xs sm:text-sm font-bold text-rose-400">Deplasman Takımı</span>
+                        <div id="away-penalty-dots" class="flex flex-wrap items-center gap-1.5"></div>
+                    </div>
+                </div>
+
+                <!-- Tek Tek Sıralı Penaltı Tablosu -->
+                <div class="overflow-x-auto rounded-xl border border-slate-800">
+                    <table class="w-full text-left border-collapse text-xs sm:text-sm">
+                        <thead>
+                            <tr class="bg-pitch-950 text-slate-400 border-b border-slate-800">
+                                <th class="py-2.5 px-3 font-semibold">Tur</th>
+                                <th class="py-2.5 px-3 font-semibold text-blue-400">Ev Sahibi Vuruşu</th>
+                                <th class="py-2.5 px-3 font-semibold text-center">Skor</th>
+                                <th class="py-2.5 px-3 font-semibold text-rose-400 text-right">Deplasman Vuruşu</th>
+                            </tr>
+                        </thead>
+                        <tbody id="penalty-table-body" class="divide-y divide-slate-800/70 bg-pitch-900/50">
+                            <!-- JS ile doldurulacak -->
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+
+            <!-- MAÇ İSTATİSTİKLERİ BÖLÜMÜ -->
+            <section class="bg-pitch-900 border border-slate-800 rounded-2xl p-4 sm:p-6 shadow-xl animate-fade-in-up">
+                <div class="flex items-center justify-between mb-5">
+                    <div class="flex items-center gap-2">
+                        <span class="text-lg">📊</span>
+                        <h3 class="font-bold text-base sm:text-lg text-white">Karşılaştırmalı Maç İstatistikleri</h3>
+                    </div>
+                    <div class="flex items-center gap-4 text-xs font-bold">
+                        <span class="flex items-center gap-1.5 text-blue-400"><span class="w-2.5 h-2.5 rounded-full bg-blue-500"></span>Ev Sahibi</span>
+                        <span class="flex items-center gap-1.5 text-rose-400"><span class="w-2.5 h-2.5 rounded-full bg-rose-500"></span>Deplasman</span>
+                    </div>
+                </div>
+
+                <div id="stats-container" class="space-y-4">
+                    <!-- JS ile istatistik barları üretilecek -->
+                </div>
+            </section>
+
+            <!-- EN ALTTA: MAÇ OLAYLARI VE DAKİKA DAKİKA SPİKER ANLATIMI -->
+            <section id="timeline-section" class="bg-pitch-900 border border-slate-800 rounded-2xl p-4 sm:p-6 shadow-xl animate-fade-in-up">
+                <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 mb-5 border-b border-slate-800">
+                    <div>
+                        <div class="flex items-center gap-2">
+                            <span class="text-lg">🎙️</span>
+                            <h3 class="font-bold text-base sm:text-lg text-white">Maç Olayları ve Dakika Dakika Anlatım</h3>
+                        </div>
+                        <p class="text-xs text-slate-400 mt-0.5">Maçta gerçekleşen tüm pozisyonlar, kartlar, goller ve kritik anların tam dökümü</p>
+                    </div>
+
+                    <!-- Filtre ve Kopyala Butonları -->
+                    <div class="flex flex-wrap items-center gap-2">
+                        <div class="bg-pitch-950 p-1 rounded-xl border border-slate-800 flex text-xs font-semibold">
+                            <button type="button" id="filter-all" onclick="filterEvents('all')" class="px-3 py-1.5 rounded-lg bg-slate-800 text-white transition">
+                                Tümü (<span id="count-all">0</span>)
+                            </button>
+                            <button type="button" id="filter-key" onclick="filterEvents('key')" class="px-3 py-1.5 rounded-lg text-slate-400 hover:text-white transition">
+                                Önemli Anlar (<span id="count-key">0</span>)
+                            </button>
+                        </div>
+
+                        <button type="button" onclick="copyFullMatchReport()" class="px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 text-xs font-semibold text-slate-200 transition flex items-center gap-1.5 cursor-pointer">
+                            <svg class="w-3.5 h-3.5 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3"/>
+                            </svg>
+                            <span>Raporu Kopyala</span>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Kronolojik Olay Akışı Listesi -->
+                <div id="events-timeline" class="relative space-y-3 before:content-[''] before:absolute before:left-[23px] sm:before:left-[27px] before:top-2 before:bottom-2 before:w-0.5 before:bg-slate-800">
+                    <!-- JS ile dakika dakika olay kartları buraya eklenecek -->
+                </div>
+            </section>
+
+        </div>
+
+        <!-- Başlangıç Boş Durum Rehberi (Henüz simülasyon yapılmadıysa) -->
+        <section id="empty-state" class="bg-pitch-900/50 border border-dashed border-slate-800 rounded-2xl p-8 sm:p-12 text-center">
+            <div class="w-16 h-16 mx-auto rounded-2xl bg-slate-800/80 border border-slate-700 flex items-center justify-center text-3xl mb-4">
+                🏟️
+            </div>
+            <h3 class="text-lg font-bold text-white">Stadyum Hazır, Başlama Düdüğü Bekleniyor</h3>
+            <p class="text-sm text-slate-400 max-w-md mx-auto mt-1.5 leading-relaxed">
+                Yukarıdan <span class="text-blue-400 font-semibold">Ev Sahibi Takım</span> ve <span class="text-rose-400 font-semibold">Deplasman Takımı</span> için 1 ile 10 arasında güç seviyelerini seçin, maç formatını belirleyin ve <strong class="text-emerald-400">"Maçı Direkt Simüle Et"</strong> butonuna basın.
+            </p>
+        </section>
+
+    </main>
+
+    <footer class="max-w-5xl mx-auto px-4 py-6 text-center text-xs text-slate-500 border-t border-slate-900 mt-10">
+        Pro Maç Simülatörü • Gerçekçi Olasılık, Kırmızı Kart Dinamiği, Uzatma & Seri Penaltı Motoru
+    </footer>
+
+    <script>
+        /**
+         * 10 Seviyeli Güç Tanımları ve Katsayıları
+         * Her seviye hücum üretkenliği ve savunma direnci için gerçekçi çarpanlar içerir.
+         */
+        const POWER_LEVELS = {
+            1:  { label: "Amatör / Mahalle Takımı", attack: 0.42, defense: 0.45 },
+            2:  { label: "Alt Lig Ekibi", attack: 0.58, defense: 0.60 },
+            3:  { label: "Düşme Hattı Mücadelesi", attack: 0.74, defense: 0.75 },
+            4:  { label: "Ligde Kalma Hedefi", attack: 0.88, defense: 0.88 },
+            5:  { label: "Dengeli / Orta Sıra", attack: 1.00, defense: 1.00 },
+            6:  { label: "Üst Sıra Zorlayıcısı", attack: 1.16, defense: 1.14 },
+            7:  { label: "Şampiyonluk Adayı", attack: 1.34, defense: 1.30 },
+            8:  { label: "Avrupa Kupası Devi", attack: 1.54, defense: 1.48 },
+            9:  { label: "Kıta Şampiyonu / Elit", attack: 1.76, defense: 1.68 },
+            10: { label: "Dünya Devi / Efsanevi", attack: 2.02, defense: 1.90 }
+        };
+
+        // Mevcut Uygulama Durumu
+        let state = {
+            homeLevel: 7,
+            awayLevel: 6,
+            matchMode: 'normal', // 'normal' veya 'knockout'
+            currentFilter: 'all',
+            lastSimulation: null
+        };
+
+        // Oyuncu pozisyon ve forma numarası havuzu (Takım ismi girilmeden gerçekçi anlatım için)
+        const PLAYER_ROLES = [
+            "Santrfor (#9)", "Sol Kanat (#11)", "Sağ Kanat (#7)", "On Numara (#10)",
+            "Merkez Orta Saha (#8)", "Ön Libero (#6)", "Sol Bek (#3)", "Sağ Bek (#2)",
+            "Stoper (#4)", "Stoper (#5)", "Genç Forvet (#19)", "Yedek Kanat (#17)",
+            "Oyun Kurucu (#20)", "Dinamik Orta Saha (#14)"
+        ];
+
+        // Yardımcı Fonksiyonlar
+        const randInt = (min, max) => Math.floor(Math.random() * (max - min + 1)) + min;
+        const pickRandom = (arr) => arr[Math.floor(Math.random() * arr.length)];
+
+        /**
+         * Sayfa Yüklendiğinde Arayüzü Başlat
+         */
+        window.addEventListener('DOMContentLoaded', () => {
+            renderLevelSelectors();
+            updateTeamCardsUI();
+        });
+
+        /**
+         * 1-10 Arası Tıklanabilir Güç Seviyesi Butonlarını Oluşturur
+         */
+        function renderLevelSelectors() {
+            const homeContainer = document.getElementById('home-level-buttons');
+            const awayContainer = document.getElementById('away-level-buttons');
+            homeContainer.innerHTML = '';
+            awayContainer.innerHTML = '';
+
+            for (let i = 1; i <= 10; i++) {
+                // Ev Sahibi Butonu
+                const hBtn = document.createElement('button');
+                hBtn.type = 'button';
+                hBtn.textContent = i;
+                hBtn.dataset.level = i;
+                hBtn.title = `Seviye ${i}: ${POWER_LEVELS[i].label}`;
+                hBtn.onclick = () => {
+                    state.homeLevel = i;
+                    updateTeamCardsUI();
+                };
+                hBtn.className = 'h-9 sm:h-10 rounded-lg font-display font-bold text-sm transition-all cursor-pointer border';
+                homeContainer.appendChild(hBtn);
+
+                // Deplasman Butonu
+                const aBtn = document.createElement('button');
+                aBtn.type = 'button';
+                aBtn.textContent = i;
+                aBtn.dataset.level = i;
+                aBtn.title = `Seviye ${i}: ${POWER_LEVELS[i].label}`;
+                aBtn.onclick = () => {
+                    state.awayLevel = i;
+                    updateTeamCardsUI();
+                };
+                aBtn.className = 'h-9 sm:h-10 rounded-lg font-display font-bold text-sm transition-all cursor-pointer border';
+                awayContainer.appendChild(aBtn);
+            }
+        }
+
+        /**
+         * Seçilen Güç Seviyelerine Göre Kart Görünümlerini Günceller
+         */
+        function updateTeamCardsUI() {
+            // Ev Sahibi Güncelleme
+            document.getElementById('home-power-display').textContent = state.homeLevel;
+            document.getElementById('home-tier-badge').textContent = `Seviye ${state.homeLevel} • ${POWER_LEVELS[state.homeLevel].label}`;
+            
+            document.querySelectorAll('#home-level-buttons button').forEach(btn => {
+                const lvl = parseInt(btn.dataset.level);
+                if (lvl <= state.homeLevel) {
+                    btn.className = 'h-9 sm:h-10 rounded-lg font-display font-bold text-sm transition-all cursor-pointer border bg-blue-600 border-blue-400 text-white shadow-sm shadow-blue-900/50';
+                } else {
+                    btn.className = 'h-9 sm:h-10 rounded-lg font-display font-bold text-sm transition-all cursor-pointer border bg-pitch-950/80 border-slate-800 text-slate-500 hover:border-slate-600 hover:text-slate-300';
+                }
+            });
+
+            // Deplasman Güncelleme
+            document.getElementById('away-power-display').textContent = state.awayLevel;
+            document.getElementById('away-tier-badge').textContent = `Seviye ${state.awayLevel} • ${POWER_LEVELS[state.awayLevel].label}`;
+
+            document.querySelectorAll('#away-level-buttons button').forEach(btn => {
+                const lvl = parseInt(btn.dataset.level);
+                if (lvl <= state.awayLevel) {
+                    btn.className = 'h-9 sm:h-10 rounded-lg font-display font-bold text-sm transition-all cursor-pointer border bg-rose-600 border-rose-400 text-white shadow-sm shadow-rose-900/50';
+                } else {
+                    btn.className = 'h-9 sm:h-10 rounded-lg font-display font-bold text-sm transition-all cursor-pointer border bg-pitch-950/80 border-slate-800 text-slate-500 hover:border-slate-600 hover:text-slate-300';
+                }
+            });
+        }
+
+        /**
+         * Maç Formatını Değiştirir (Normal / Eleme Usulü)
+         */
+        function setMatchMode(mode) {
+            state.matchMode = mode;
+            const normalBtn = document.getElementById('mode-normal');
+            const knockoutBtn = document.getElementById('mode-knockout');
+
+            if (mode === 'normal') {
+                normalBtn.className = 'px-3.5 py-2 rounded-lg text-xs sm:text-sm font-semibold transition flex items-center justify-center gap-1.5 bg-slate-800 text-white shadow';
+                knockoutBtn.className = 'px-3.5 py-2 rounded-lg text-xs sm:text-sm font-semibold transition flex items-center justify-center gap-1.5 text-slate-400 hover:text-slate-200';
+            } else {
+                knockoutBtn.className = 'px-3.5 py-2 rounded-lg text-xs sm:text-sm font-semibold transition flex items-center justify-center gap-1.5 bg-amber-500/20 text-amber-300 border border-amber-500/30 shadow';
+                normalBtn.className = 'px-3.5 py-2 rounded-lg text-xs sm:text-sm font-semibold transition flex items-center justify-center gap-1.5 text-slate-400 hover:text-slate-200';
+            }
+        }
+
+        /**
+         * ANA FUTBOL MAÇ SİMÜLASYON MOTORU
+         * Dakika dakika ilerler, kırmızı kartları, yorgunluğu, uzatmaları ve penaltıları hesaplar.
+         */
+        function simulateMatch() {
+            const homeLvl = state.homeLevel;
+            const awayLvl = state.awayLevel;
+            const homeSpec = POWER_LEVELS[homeLvl];
+            const awaySpec = POWER_LEVELS[awayLvl];
+
+            // Maç İstatistikleri Nesnesi
+            const stats = {
+                home: { goals: 0, htGoals: 0, ninetyGoals: 0, shots: 0, onTarget: 0, corners: 0, fouls: 0, yellow: 0, red: 0, saves: 0, woodwork: 0 },
+                away: { goals: 0, htGoals: 0, ninetyGoals: 0, shots: 0, onTarget: 0, corners: 0, fouls: 0, yellow: 0, red: 0, saves: 0, woodwork: 0 }
+            };
+
+            // Sarı kart gören oyuncuları takip edelim ki ikinci sarıdan kırmızı kart çıkabilsin
+            const yellowCardedPlayers = { home: [], away: [] };
+            const events = [];
+            const scorers = { home: [], away: [] };
+
+            // İç saha ufak psikolojik avantajı (%6)
+            const homeAdvantage = 1.06;
+
+            // Başlama Düdüğü
+            events.push({
+                minute: 1,
+                displayMin: "1'",
+                team: 'neutral',
+                type: 'whistle',
+                isKey: false,
+                title: "Maç Başladı!",
+                desc: `Hakemin ilk düdüğüyle karşılaşma başladı. Ev Sahibi Takım (Seviye ${homeLvl}) ile Deplasman Takımı (Seviye ${awayLvl}) kozlarını paylaşıyor.`
+            });
+
+            // Belirli bir dakika aralığını simüle eden yardımcı fonksiyon
+            function simulatePeriod(startMin, endMin, periodName) {
+                for (let min = startMin; min <= endMin; min++) {
+                    // Kırmızı kart cezası: Her eksik oyuncu takım gücünü %18 düşürür
+                    const homeRedFactor = Math.max(0.45, 1 - (stats.home.red * 0.18));
+                    const awayRedFactor = Math.max(0.45, 1 - (stats.away.red * 0.18));
+
+                    const effHomeAtk = homeSpec.attack * homeAdvantage * homeRedFactor;
+                    const effHomeDef = homeSpec.defense * homeAdvantage * homeRedFactor;
+                    const effAwayAtk = awaySpec.attack * awayRedFactor;
+                    const effAwayDef = awaySpec.defense * awayRedFactor;
+
+                    // O dakikada aksiyon olma ihtimali (~%34)
+                    if (Math.random() > 0.34) continue;
+
+                    // Hangi takımın aksiyon üreteceği (Hücum güçleri oranına göre)
+                    const totalAtk = effHomeAtk + effAwayAtk;
+                    const isHomeAction = Math.random() < (effHomeAtk / totalAtk);
+                    const side = isHomeAction ? 'home' : 'away';
+                    const oppSide = isHomeAction ? 'away' : 'home';
+                    const teamName = isHomeAction ? 'Ev Sahibi Takım' : 'Deplasman Takımı';
+                    const oppName = isHomeAction ? 'Deplasman Takımı' : 'Ev Sahibi Takım';
+
+                    const atkPower = isHomeAction ? effHomeAtk : effAwayAtk;
+                    const defPower = isHomeAction ? effAwayDef : effHomeDef;
+                    const ratio = atkPower / defPower; // > 1 ise hücum eden takım daha üstün
+
+                    const roll = Math.random();
+
+                    // 1. DURUM: ŞUT / GOL POZİSYONU (%54 olasılık)
+                    if (roll < 0.54) {
+                        stats[side].shots++;
+                        const player = pickRandom(PLAYER_ROLES);
+                        const assister = pickRandom(PLAYER_ROLES.filter(p => p !== player));
+
+                        // İsabetli şut olasılığı
+                        const onTargetProb = Math.min(0.68, Math.max(0.28, 0.42 * Math.sqrt(ratio)));
+                        
+                        if (Math.random() < onTargetProb) {
+                            stats[side].onTarget++;
+
+                            // Gol olma olasılığı (Güç farkına duyarlı)
+                            const goalProb = Math.min(0.55, Math.max(0.14, 0.27 * Math.pow(ratio, 0.65)));
+
+                            if (Math.random() < goalProb) {
+                                // GOOOOOL!
+                                stats[side].goals++;
+                                if (min <= 45) stats[side].htGoals++;
+                                if (min <= 90) stats[side].ninetyGoals++;
+
+                                const goalTypes = [
+                                    `${assister} ara pasında ceza sahasına sızdı ve yerden düzgün bir vuruşla ağları sarstı!`,
+                                    `Ceza yayı üzerinden gelişine nefis vurdu, top doksana gitti!`,
+                                    `${assister} tarafından yapılan ortada iyi yükseldi ve kafayla kaleciyi avladı!`,
+                                    `Hızlı gelişen kontra atakta kaleciyle karşı karşıya kaldı, soğukkanlı bir plaseyle topu filelere gönderdi!`,
+                                    `Ceza sahası içindeki karambolde topu önünde buldu ve sert bir vuruşla golü kaydetti!`
+                                ];
+
+                                const minLabel = formatMinute(min, periodName);
+                                scorers[side].push(`${player} (${minLabel})`);
+
+                                events.push({
+                                    minute: min,
+                                    displayMin: minLabel,
+                                    team: side,
+                                    type: 'goal',
+                                    isKey: true,
+                                    title: `GOOOL! ${teamName} (${stats.home.goals} - ${stats.away.goals})`,
+                                    desc: `${teamName} öne geçiyor/farkı açıyor! ${player}, ${pickRandom(goalTypes)}`
+                                });
+                            } else {
+                                // Kaleci Kurtarışı veya Direk
+                                if (Math.random() < 0.16) {
+                                    stats[side].woodwork++;
+                                    events.push({
+                                        minute: min,
+                                        displayMin: formatMinute(min, periodName),
+                                        team: side,
+                                        type: 'woodwork',
+                                        isKey: false,
+                                        title: `DİREKTEN DÖNDÜ! (${teamName})`,
+                                        desc: `${teamName} gole çok yaklaştı! ${player} çok sert vurdu ancak top üst direkten oyun alanına geri döndü!`
+                                    });
+                                } else {
+                                    stats[oppSide].saves++;
+                                    if (Math.random() < 0.45) stats[side].corners++;
+                                    events.push({
+                                        minute: min,
+                                        displayMin: formatMinute(min, periodName),
+                                        team: side,
+                                        type: 'save',
+                                        isKey: false,
+                                        title: `Kritik Kurtarış! (${oppName} Kalecisi)`,
+                                        desc: `${teamName} adına ${player} yakın mesafeden şutunu çekti, ${oppName} kalecisi müthiş bir refleksle gole izin vermedi!`
+                                    });
+                                }
+                            }
+                        } else {
+                            // Aut / Dışarı Giden Şut
+                            if (Math.random() < 0.35) {
+                                events.push({
+                                    minute: min,
+                                    displayMin: formatMinute(min, periodName),
+                                    team: side,
+                                    type: 'chance',
+                                    isKey: false,
+                                    title: `Tehlikeli Atak (${teamName})`,
+                                    desc: `${teamName} kanattan etkili geldi, ${player} ceza sahası dışından şansını denedi fakat top az farkla auta çıktı.`
+                                });
+                            }
+                        }
+                    }
+                    // 2. DURUM: KORNER VE DURAN TOP ORGANİZASYONU (%18 olasılık)
+                    else if (roll < 0.72) {
+                        stats[side].corners++;
+                        if (Math.random() < 0.40) {
+                            events.push({
+                                minute: min,
+                                displayMin: formatMinute(min, periodName),
+                                team: side,
+                                type: 'corner',
+                                isKey: false,
+                                title: `Köşe Vuruşu (${teamName})`,
+                                desc: `${teamName} baskısını artırdı ve sağ kanattan köşe vuruşu kazandı. Ceza sahası içi oldukça hareketli.`
+                            });
+                        }
+                    }
+                    // 3. DURUM: FAUL, SARI KART VE KIRMIZI KART (%22 olasılık)
+                    else if (roll < 0.94) {
+                        // Güçsüz takım güçlü takımı durdururken biraz daha fazla faul yapabilir
+                        const foulSide = Math.random() < (0.5 + (atkPower - defPower) * 0.08) ? oppSide : side;
+                        const foulTeamName = foulSide === 'home' ? 'Ev Sahibi Takım' : 'Deplasman Takımı';
+                        const offender = pickRandom(PLAYER_ROLES);
+
+                        stats[foulSide].fouls++;
+
+                        const cardRoll = Math.random();
+                        // Direkt Kırmızı Kart (%3.5 ihtimal)
+                        if (cardRoll < 0.035 && stats[foulSide].red < 3) {
+                            stats[foulSide].red++;
+                            events.push({
+                                minute: min,
+                                displayMin: formatMinute(min, periodName),
+                                team: foulSide,
+                                type: 'red',
+                                isKey: true,
+                                title: `KIRMIZI KART! (${foulTeamName} 10 Kişi!)`,
+                                desc: `${foulTeamName} oyuncusu ${offender}, rakibine yaptığı çok sert müdahale sonrası hakemden direkt KIRMIZI KART gördü ve oyun dışında kaldı!`
+                            });
+                        }
+                        // Sarı Kart (%24 ihtimal)
+                        else if (cardRoll < 0.275) {
+                            if (yellowCardedPlayers[foulSide].includes(offender) && stats[foulSide].red < 3) {
+                                // İkinci Sarıdan Kırmızı!
+                                stats[foulSide].yellow++;
+                                stats[foulSide].red++;
+                                events.push({
+                                    minute: min,
+                                    displayMin: formatMinute(min, periodName),
+                                    team: foulSide,
+                                    type: 'red',
+                                    isKey: true,
+                                    title: `İKİNCİ SARI VE KIRMIZI KART! (${foulTeamName})`,
+                                    desc: `Daha önce sarı kartı bulunan ${offender} (${foulTeamName}), taktik faul sonrası ikinci sarı karttan KIRMIZI KART ile oyun dışı kaldı!`
+                                });
+                            } else {
+                                yellowCardedPlayers[foulSide].push(offender);
+                                stats[foulSide].yellow++;
+                                events.push({
+                                    minute: min,
+                                    displayMin: formatMinute(min, periodName),
+                                    team: foulSide,
+                                    type: 'yellow',
+                                    isKey: true,
+                                    title: `Sarı Kart (${foulTeamName})`,
+                                    desc: `${foulTeamName} takımında ${offender}, orta sahada rakibini çekerek durdurduğu için sarı kartla cezalandırıldı.`
+                                });
+                            }
+                        }
+                    }
+                    // 4. DURUM: OYUNCU DEĞİŞİKLİĞİ / TAKTİK HAMLE (%6 olasılık, 55. dk sonrası)
+                    else if (min >= 55 && Math.random() < 0.45) {
+                        events.push({
+                            minute: min,
+                            displayMin: formatMinute(min, periodName),
+                            team: side,
+                            type: 'sub',
+                            isKey: false,
+                            title: `Oyuncu Değişikliği (${teamName})`,
+                            desc: `${teamName} kenar yönetimi oyuna taze kan sürüyor. Yorulan oyuncunun yerine dinç bir isim sahaya dahil oldu.`
+                        });
+                    }
+                }
+            }
+
+            // 1. YARI (1 - 45 Dk)
+            simulatePeriod(1, 45, '1H');
+
+            // Uzatma dakikası ekleyelim (45+1 gibi)
+            events.push({
+                minute: 45.5,
+                displayMin: "45+2'",
+                team: 'neutral',
+                type: 'whistle',
+                isKey: false,
+                title: `İlk Yarı Sona Erdi (${stats.home.htGoals} - ${stats.away.htGoals})`,
+                desc: `İlk 45 dakikanın son düdüğü çaldı. Takımlar soyunma odasına ${stats.home.htGoals} - ${stats.away.htGoals} eşitlikle/skorla gidiyor.`
+            });
+
+            // 2. YARI (46 - 90 Dk)
+            simulatePeriod(46, 90, '2H');
+
+            let wentToExtraTime = false;
+            let penaltyData = null;
+            let matchWinner = null; // 'home', 'away', 'draw'
+
+            // 90 Dakika Sonu Kontrolü
+            if (state.matchMode === 'knockout' && stats.home.goals === stats.away.goals) {
+                wentToExtraTime = true;
+                events.push({
+                    minute: 90.5,
+                    displayMin: "90+4'",
+                    team: 'neutral',
+                    type: 'whistle',
+                    isKey: true,
+                    title: `90 Dakika Berabere Bitti! Uzatmalara Gidiliyor (${stats.home.goals} - ${stats.away.goals})`,
+                    desc: `Normal sürede eşitlik bozulmadı! Eleme usulü gereği 15'er dakikalık iki uzatma devresi oynanacak.`
+                });
+
+                // 1. UZATMA DEVRESİ (91 - 105)
+                simulatePeriod(91, 105, 'ET1');
+                events.push({
+                    minute: 105.5,
+                    displayMin: "105+1'",
+                    team: 'neutral',
+                    type: 'whistle',
+                    isKey: false,
+                    title: `İlk Uzatma Devresi Tamamlandı (${stats.home.goals} - ${stats.away.goals})`,
+                    desc: `105 dakika geride kaldı, takımlar saha değişimi yapıyor. Nefesler tutuldu!`
+                });
+
+                // 2. UZATMA DEVRESİ (106 - 120)
+                simulatePeriod(106, 120, 'ET2');
+
+                if (stats.home.goals === stats.away.goals) {
+                    // PENALTI ATIŞLARINA GİDİLİYOR!
+                    events.push({
+                        minute: 120.5,
+                        displayMin: "120+2'",
+                        team: 'neutral',
+                        type: 'whistle',
+                        isKey: true,
+                        title: `120 Dakika Sonunda da Eşitlik Bozulmadı! SERİ PENALTILAR!`,
+                        desc: `Uzatmalarda da kazanan çıkmadı (${stats.home.goals} - ${stats.away.goals}). Turu geçen tarafı seri penaltı atışları belirleyecek!`
+                    });
+
+                    penaltyData = simulatePenaltyShootout(homeLvl, awayLvl, stats.home.red, stats.away.red, events);
+                    matchWinner = penaltyData.winner;
+                } else {
+                    matchWinner = stats.home.goals > stats.away.goals ? 'home' : 'away';
+                    const winnerName = matchWinner === 'home' ? 'Ev Sahibi Takım' : 'Deplasman Takımı';
+                    events.push({
+                        minute: 121,
+                        displayMin: "120+2'",
+                        team: 'neutral',
+                        type: 'whistle',
+                        isKey: true,
+                        title: `UZATMALARDA MAÇ SONA ERDİ! Kazanan: ${winnerName}`,
+                        desc: `120 dakikalık nefes kesen mücadelenin ardından ${winnerName} sahadan ${stats.home.goals} - ${stats.away.goals} galip ayrıldı!`
+                    });
+                }
+            } else {
+                // Normal maç bitti veya eleme usulünde 90 dakikada kazanan çıktı
+                if (stats.home.goals > stats.away.goals) matchWinner = 'home';
+                else if (stats.away.goals > stats.home.goals) matchWinner = 'away';
+                else matchWinner = 'draw';
+
+                const endTitle = matchWinner === 'draw'
+                    ? `MAÇ SONA ERDİ! Beraberlik (${stats.home.goals} - ${stats.away.goals})`
+                    : `MAÇ SONA ERDİ! Kazanan: ${matchWinner === 'home' ? 'Ev Sahibi Takım' : 'Deplasman Takımı'}`;
+
+                events.push({
+                    minute: 91,
+                    displayMin: "90+4'",
+                    team: 'neutral',
+                    type: 'whistle',
+                    isKey: true,
+                    title: endTitle,
+                    desc: `Hakem son düdüğünü çaldı! Karşılaşma ${stats.home.goals} - ${stats.away.goals} skoruyla tamamlandı.`
+                });
+            }
+
+            // Topla Oynama Yüzdesini Hesapla (Güç seviyeleri + şut/korner aktivitesine dayalı)
+            const homeRawPoss = (homeSpec.attack + homeSpec.defense) * 10 + (stats.home.shots * 1.4) + (stats.home.corners * 1.2) - (stats.home.red * 6);
+            const awayRawPoss = (awaySpec.attack + awaySpec.defense) * 10 + (stats.away.shots * 1.4) + (stats.away.corners * 1.2) - (stats.away.red * 6);
+            const totalPoss = Math.max(1, homeRawPoss + awayRawPoss);
+            let homePoss = Math.round((homeRawPoss / totalPoss) * 100);
+            homePoss = Math.min(82, Math.max(18, homePoss));
+            const awayPoss = 100 - homePoss;
+
+            stats.home.possession = homePoss;
+            stats.away.possession = awayPoss;
+
+            // Sonucu kaydet ve ekrana çiz
+            state.lastSimulation = {
+                homeLvl,
+                awayLvl,
+                matchMode: state.matchMode,
+                wentToExtraTime,
+                penaltyData,
+                matchWinner,
+                stats,
+                scorers,
+                events
+            };
+
+            renderSimulationResults(state.lastSimulation);
+        }
+
+        /**
+         * Seri Penaltı Atışları Simülasyonu (İlk 5 atış + gerekirse seri ölüm kalım turları)
+         */
+        function simulatePenaltyShootout(homeLvl, awayLvl, homeRed, awayRed, events) {
+            // Penaltı isabet oranı: Temel %76 + seviye etkisi (kaleci/şutör kalitesi)
+            const homeScoreProb = Math.min(0.88, Math.max(0.64, 0.72 + (homeLvl - 5) * 0.018));
+            const awayScoreProb = Math.min(0.88, Math.max(0.64, 0.72 + (awayLvl - 5) * 0.018));
+
+            let homePenGoals = 0;
+            let awayPenGoals = 0;
+            const rounds = []; // Her tur { round, homeShot, awayShot, scoreAfter }
+
+            let round = 1;
+            while (round <= 15) {
+                const homeShooter = PLAYER_ROLES[(round - 1) % PLAYER_ROLES.length];
+                const awayShooter = PLAYER_ROLES[(round + 1) % PLAYER_ROLES.length];
+
+                // 1. Ev Sahibi Vuruşu
+                const homeScored = Math.random() < homeScoreProb;
+                if (homeScored) homePenGoals++;
+                const homeMissReason = pickRandom(["Kaleci köşeyi doğru tahmin etti ve kurtardı!", "Top üst direğe çarpıp dışarı gitti!", "Plase vuruşta top direğin yanından auta çıktı!"]);
+
+                events.push({
+                    minute: 121 + round * 0.1,
+                    displayMin: `PEN ${round}`,
+                    team: 'home',
+                    type: homeScored ? 'pen_goal' : 'pen_miss',
+                    isKey: true,
+                    title: `${round}. Penaltı - Ev Sahibi: ${homeScored ? 'GOL ✅' : 'KAÇIRDI ❌'} (${homePenGoals}-${awayPenGoals})`,
+                    desc: homeScored
+                        ? `Ev Sahibi Takım adına ${homeShooter} topu ve kaleciyi ayrı köşelere gönderdi!`
+                        : `Ev Sahibi Takım adına ${homeShooter} penaltıdan yararlanamadı! ${homeMissReason}`
+                });
+
+                // İlk 5 tur içinde matematiksel olarak maç bittiyse kontrol et
+                if (round <= 5) {
+                    const homeRem = 5 - round;
+                    const awayRem = 5 - (round - 1);
+                    if (homePenGoals > awayPenGoals + awayRem || awayPenGoals > homePenGoals + homeRem) {
+                        rounds.push({
+                            round,
+                            home: { scored: homeScored, player: homeShooter },
+                            away: null,
+                            score: `${homePenGoals} - ${awayPenGoals}`
+                        });
+                        break;
+                    }
+                }
+
+                // 2. Deplasman Vuruşu
+                const awayScored = Math.random() < awayScoreProb;
+                if (awayScored) awayPenGoals++;
+                const awayMissReason = pickRandom(["Ev sahibi kalecisi uzandı ve harika çıkardı!", "Sert vuruşta top üstten auta gitti!", "Kalecinin üzerine vurdu, gol izni yok!"]);
+
+                events.push({
+                    minute: 121 + round * 0.1 + 0.05,
+                    displayMin: `PEN ${round}`,
+                    team: 'away',
+                    type: awayScored ? 'pen_goal' : 'pen_miss',
+                    isKey: true,
+                    title: `${round}. Penaltı - Deplasman: ${awayScored ? 'GOL ✅' : 'KAÇIRDI ❌'} (${homePenGoals}-${awayPenGoals})`,
+                    desc: awayScored
+                        ? `Deplasman Takımı adına ${awayShooter} ağları havalandırdı ve skoru ${homePenGoals}-${awayPenGoals} yaptı.`
+                        : `Deplasman Takımı adına ${awayShooter} penaltıyı kaçırdı! ${awayMissReason}`
+                });
+
+                rounds.push({
+                    round,
+                    home: { scored: homeScored, player: homeShooter },
+                    away: { scored: awayScored, player: awayShooter },
+                    score: `${homePenGoals} - ${awayPenGoals}`
+                });
+
+                // İlk 5 tur içinde erken bitiş kontrolü
+                if (round < 5) {
+                    const rem = 5 - round;
+                    if (homePenGoals > awayPenGoals + rem || awayPenGoals > homePenGoals + rem) {
+                        break;
+                    }
+                } else if (round >= 5) {
+                    // 5. tur ve sonrasında eşitlik bozulduysa seri penaltılar biter
+                    if (homePenGoals !== awayPenGoals) {
+                        break;
+                    }
+                }
+                round++;
+            }
+
+            // Güvenlik: 15 tur sonunda hala eşitse yazı tura niteliğinde son vuruş
+            if (homePenGoals === awayPenGoals) {
+                homePenGoals++;
+                rounds.push({
+                    round: round + 1,
+                    home: { scored: true, player: "Kaleci (#1)" },
+                    away: { scored: false, player: "Kaleci (#1)" },
+                    score: `${homePenGoals} - ${awayPenGoals}`
+                });
+            }
+
+            const winner = homePenGoals > awayPenGoals ? 'home' : 'away';
+            const winnerName = winner === 'home' ? 'Ev Sahibi Takım' : 'Deplasman Takımı';
+
+            events.push({
+                minute: 125,
+                displayMin: "SONUÇ",
+                team: winner,
+                type: 'whistle',
+                isKey: true,
+                title: `PENALTILARLA KAZANAN: ${winnerName.toUpperCase()} (${homePenGoals} - ${awayPenGoals})`,
+                desc: `Nefes kesen seri penaltı atışları sonucunda ${winnerName} rakibine ${homePenGoals}-${awayPenGoals} üstünlük kurarak tur atladı!`
+            });
+
+            return {
+                homeScore: homePenGoals,
+                awayScore: awayPenGoals,
+                winner,
+                rounds
+            };
+        }
+
+        /**
+         * Dakika biçimlendirme yardımcı fonksiyonu (örn. 45+1', 90+3', 114')
+         */
+        function formatMinute(min, periodName) {
+            if (periodName === '1H' && min === 45) return `45+${randInt(1, 3)}'`;
+            if (periodName === '2H' && min === 90) return `90+${randInt(1, 5)}'`;
+            if (periodName === 'ET1' && min === 105) return `105+1'`;
+            if (periodName === 'ET2' && min === 120) return `120+${randInt(1, 2)}'`;
+            return `${min}'`;
+        }
+
+        /**
+         * Tüm Simülasyon Verilerini Ekrana Çizer
+         */
+        function renderSimulationResults(sim) {
+            document.getElementById('empty-state').classList.add('hidden');
+            const wrapper = document.getElementById('results-wrapper');
+            wrapper.classList.remove('hidden');
+
+            // 1. Skorbord Bilgileri
+            document.getElementById('final-home-score').textContent = sim.stats.home.goals;
+            document.getElementById('final-away-score').textContent = sim.stats.away.goals;
+            document.getElementById('score-home-level').textContent = `Seviye ${sim.homeLvl} • ${POWER_LEVELS[sim.homeLvl].label}`;
+            document.getElementById('score-away-level').textContent = `Seviye ${sim.awayLvl} • ${POWER_LEVELS[sim.awayLvl].label}`;
+            document.getElementById('match-summary-badge').textContent = `Güç Dengesi: Sv.${sim.homeLvl} vs Sv.${sim.awayLvl}`;
+            document.getElementById('halftime-score-text').textContent = `İlk Yarı: ${sim.stats.home.htGoals} - ${sim.stats.away.htGoals}`;
+
+            const statusLabel = document.getElementById('match-status-label');
+            const extraText = document.getElementById('extratime-score-text');
+            const penBadge = document.getElementById('penalty-score-badge');
+
+            if (sim.penaltyData) {
+                statusLabel.textContent = "MAÇ SONUCU • PENALTILARLA";
+                extraText.classList.remove('hidden');
+                extraText.textContent = `90 Dk: ${sim.stats.home.ninetyGoals}-${sim.stats.away.ninetyGoals} | 120 Dk: ${sim.stats.home.goals}-${sim.stats.away.goals}`;
+                penBadge.classList.remove('hidden');
+                penBadge.textContent = `Penaltılar: ${sim.penaltyData.homeScore} - ${sim.penaltyData.awayScore}`;
+            } else if (sim.wentToExtraTime) {
+                statusLabel.textContent = "MAÇ SONUCU • UZATMALARDA (120 DK)";
+                extraText.classList.remove('hidden');
+                extraText.textContent = `90 Dakika Sonucu: ${sim.stats.home.ninetyGoals} - ${sim.stats.away.ninetyGoals}`;
+                penBadge.classList.add('hidden');
+            } else {
+                statusLabel.textContent = "MAÇ SONUCU • 90 DAKİKA";
+                extraText.classList.add('hidden');
+                penBadge.classList.add('hidden');
+            }
+
+            // Gol Atanlar Özeti
+            const homeScorersEl = document.getElementById('home-scorers-list');
+            const awayScorersEl = document.getElementById('away-scorers-list');
+            homeScorersEl.innerHTML = sim.scorers.home.length
+                ? sim.scorers.home.map(s => `<div class="text-blue-200/90">⚽ ${s}</div>`).join('')
+                : `<div class="text-slate-600 italic">Gol yok</div>`;
+
+            awayScorersEl.innerHTML = sim.scorers.away.length
+                ? sim.scorers.away.map(s => `<div class="text-rose-200/90">⚽ ${s}</div>`).join('')
+                : `<div class="text-slate-600 italic">Gol yok</div>`;
+
+            // 2. Penaltı Tablosu (Varsa)
+            const penSection = document.getElementById('penalty-shootout-section');
+            if (sim.penaltyData) {
+                penSection.classList.remove('hidden');
+                renderPenaltySection(sim.penaltyData);
+            } else {
+                penSection.classList.add('hidden');
+            }
+
+            // 3. İstatistikler
+            renderStatsSection(sim.stats);
+
+            // 4. Dakika Dakika Olaylar
+            state.currentFilter = 'all';
+            updateFilterButtons();
+            renderTimelineEvents(sim.events);
+
+            // Yumuşak kaydırma ile skorborda odaklan
+            document.getElementById('scoreboard-section').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        }
+
+        /**
+         * Seri Penaltı Görsel Noktalarını ve Tablosunu Render Eder
+         */
+        function renderPenaltySection(pen) {
+            const winnerName = pen.winner === 'home' ? 'Ev Sahibi Takım' : 'Deplasman Takımı';
+            document.getElementById('penalty-winner-banner').textContent = `🏆 Penaltılarla Kazanan: ${winnerName} (${pen.homeScore} - ${pen.awayScore})`;
+
+            const homeDots = document.getElementById('home-penalty-dots');
+            const awayDots = document.getElementById('away-penalty-dots');
+            const tbody = document.getElementById('penalty-table-body');
+
+            homeDots.innerHTML = '';
+            awayDots.innerHTML = '';
+            tbody.innerHTML = '';
+
+            pen.rounds.forEach(r => {
+                // Nokta rozetleri
+                if (r.home) {
+                    homeDots.innerHTML += r.home.scored
+                        ? `<span title="${r.round}. Penaltı: Gol" class="w-7 h-7 rounded-full bg-emerald-500/20 border border-emerald-500 text-emerald-400 flex items-center justify-center text-xs font-bold">✓</span>`
+                        : `<span title="${r.round}. Penaltı: Kaçırdı" class="w-7 h-7 rounded-full bg-rose-500/20 border border-rose-500 text-rose-400 flex items-center justify-center text-xs font-bold">✕</span>`;
+                }
+                if (r.away) {
+                    awayDots.innerHTML += r.away.scored
+                        ? `<span title="${r.round}. Penaltı: Gol" class="w-7 h-7 rounded-full bg-emerald-500/20 border border-emerald-500 text-emerald-400 flex items-center justify-center text-xs font-bold">✓</span>`
+                        : `<span title="${r.round}. Penaltı: Kaçırdı" class="w-7 h-7 rounded-full bg-rose-500/20 border border-rose-500 text-rose-400 flex items-center justify-center text-xs font-bold">✕</span>`;
+                }
+
+                // Tablo satırı
+                const homeCell = r.home
+                    ? `<div class="flex items-center gap-2">
+                        <span class="px-2 py-0.5 rounded text-[11px] font-bold ${r.home.scored ? 'bg-emerald-500/20 text-emerald-300' : 'bg-rose-500/20 text-rose-300'}">
+                            ${r.home.scored ? 'GOL ✅' : 'KAÇIRDI ❌'}
+                        </span>
+                        <span class="text-slate-300 text-xs">${r.home.player}</span>
+                       </div>`
+                    : `<span class="text-slate-600 text-xs">-</span>`;
+
+                const awayCell = r.away
+                    ? `<div class="flex items-center justify-end gap-2">
+                        <span class="text-slate-300 text-xs">${r.away.player}</span>
+                        <span class="px-2 py-0.5 rounded text-[11px] font-bold ${r.away.scored ? 'bg-emerald-500/20 text-emerald-300' : 'bg-rose-500/20 text-rose-300'}">
+                            ${r.away.scored ? 'GOL ✅' : 'KAÇIRDI ❌'}
+                        </span>
+                       </div>`
+                    : `<span class="text-slate-600 text-xs">Atışa gerek kalmadı</span>`;
+
+                tbody.innerHTML += `
+                    <tr class="hover:bg-slate-800/40 transition">
+                        <td class="py-2.5 px-3 font-bold text-slate-400">${r.round}. Penaltı</td>
+                        <td class="py-2.5 px-3">${homeCell}</td>
+                        <td class="py-2.5 px-3 text-center font-display font-bold text-amber-300">${r.score}</td>
+                        <td class="py-2.5 px-3 text-right">${awayCell}</td>
+                    </tr>
+                `;
+            });
+        }
+
+        /**
+         * Karşılaştırmalı İstatistik Barlarını Oluşturur
+         */
+        function renderStatsSection(stats) {
+            const rows = [
+                { label: "Topla Oynama (%)", home: stats.home.possession, away: stats.away.possession, suffix: "%" },
+                { label: "Toplam Şut", home: stats.home.shots, away: stats.away.shots },
+                { label: "İsabetli Şut", home: stats.home.onTarget, away: stats.away.onTarget },
+                { label: "Kaleci Kurtarışı", home: stats.home.saves, away: stats.away.saves },
+                { label: "Köşe Vuruşu (Korner)", home: stats.home.corners, away: stats.away.corners },
+                { label: "Direkten Dönen Top", home: stats.home.woodwork, away: stats.away.woodwork },
+                { label: "Faul", home: stats.home.fouls, away: stats.away.fouls },
+                { label: "Sarı Kart", home: stats.home.yellow, away: stats.away.yellow },
+                { label: "Kırmızı Kart", home: stats.home.red, away: stats.away.red }
+            ];
+
+            const container = document.getElementById('stats-container');
+            container.innerHTML = rows.map(row => {
+                const total = row.home + row.away;
+                const homePct = total === 0 ? 50 : Math.round((row.home / total) * 100);
+                const awayPct = 100 - homePct;
+                const suffix = row.suffix || "";
+
+                return `
+                    <div class="space-y-1.5">
+                        <div class="flex items-center justify-between text-xs sm:text-sm font-bold">
+                            <span class="text-blue-400 w-14 text-left">${row.home}${suffix}</span>
+                            <span class="text-slate-300 font-medium text-center">${row.label}</span>
+                            <span class="text-rose-400 w-14 text-right">${row.away}${suffix}</span>
+                        </div>
+                        <div class="w-full h-2.5 bg-pitch-950 rounded-full overflow-hidden flex gap-0.5 p-0.5 border border-slate-800">
+                            <div style="width: ${homePct}%" class="bg-gradient-to-r from-blue-600 to-blue-400 rounded-l-full transition-all duration-500"></div>
+                            <div style="width: ${awayPct}%" class="bg-gradient-to-l from-rose-600 to-rose-400 rounded-r-full transition-all duration-500"></div>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        /**
+         * Olayları Filtreleme (Tümü vs Sadece Önemli Anlar)
+         */
+        function filterEvents(filterType) {
+            state.currentFilter = filterType;
+            updateFilterButtons();
+            if (state.lastSimulation) {
+                renderTimelineEvents(state.lastSimulation.events);
+            }
+        }
+
+        function updateFilterButtons() {
+            const allBtn = document.getElementById('filter-all');
+            const keyBtn = document.getElementById('filter-key');
+
+            if (state.currentFilter === 'all') {
+                allBtn.className = 'px-3 py-1.5 rounded-lg bg-slate-800 text-white transition';
+                keyBtn.className = 'px-3 py-1.5 rounded-lg text-slate-400 hover:text-white transition';
+            } else {
+                keyBtn.className = 'px-3 py-1.5 rounded-lg bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 transition';
+                allBtn.className = 'px-3 py-1.5 rounded-lg text-slate-400 hover:text-white transition';
+            }
+        }
+
+        /**
+         * Dakika Dakika Spiker Anlatım Listesini Oluşturur
+         */
+        function renderTimelineEvents(events) {
+            document.getElementById('count-all').textContent = events.length;
+            document.getElementById('count-key').textContent = events.filter(e => e.isKey).length;
+
+            const filtered = state.currentFilter === 'key'
+                ? events.filter(e => e.isKey)
+                : events;
+
+            const timeline = document.getElementById('events-timeline');
+            timeline.innerHTML = filtered.map(ev => {
+                // Olay türüne göre ikon ve renk stilleri
+                const meta = getEventVisualMeta(ev);
+
+                return `
+                    <div class="relative flex items-start gap-3.5 sm:gap-4 pl-1">
+                        <!-- Dakika Rozeti -->
+                        <div class="relative z-10 w-11 sm:w-12 h-8 rounded-xl ${meta.badgeBg} border ${meta.badgeBorder} flex items-center justify-center font-display font-bold text-xs sm:text-sm ${meta.badgeText} flex-shrink-0 shadow">
+                            ${ev.displayMin}
+                        </div>
+
+                        <!-- Olay İçerik Kartı -->
+                        <div class="flex-1 rounded-xl p-3 sm:p-3.5 border ${meta.cardBg} ${meta.cardBorder} transition hover:border-slate-600">
+                            <div class="flex flex-wrap items-center justify-between gap-2 mb-1">
+                                <div class="flex items-center gap-2">
+                                    <span class="text-base leading-none">${meta.icon}</span>
+                                    <h4 class="font-bold text-xs sm:text-sm ${meta.titleColor}">${ev.title}</h4>
+                                </div>
+                                ${ev.team !== 'neutral' ? `
+                                    <span class="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-md ${ev.team === 'home' ? 'bg-blue-500/15 text-blue-300' : 'bg-rose-500/15 text-rose-300'}">
+                                        ${ev.team === 'home' ? 'Ev Sahibi' : 'Deplasman'}
+                                    </span>
+                                ` : ''}
+                            </div>
+                            <p class="text-xs sm:text-sm text-slate-300 leading-relaxed">${ev.desc}</p>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        function getEventVisualMeta(ev) {
+            switch (ev.type) {
+                case 'goal':
+                case 'pen_goal':
+                    return {
+                        icon: '⚽',
+                        badgeBg: 'bg-emerald-600',
+                        badgeBorder: 'border-emerald-400',
+                        badgeText: 'text-white',
+                        cardBg: 'bg-emerald-950/35',
+                        cardBorder: 'border-emerald-500/40',
+                        titleColor: 'text-emerald-300'
+                    };
+                case 'yellow':
+                    return {
+                        icon: '🟨',
+                        badgeBg: 'bg-amber-500/20',
+                        badgeBorder: 'border-amber-500/50',
+                        badgeText: 'text-amber-300',
+                        cardBg: 'bg-pitch-950/80',
+                        cardBorder: 'border-amber-500/25',
+                        titleColor: 'text-amber-300'
+                    };
+                case 'red':
+                    return {
+                        icon: '🟥',
+                        badgeBg: 'bg-red-600/30',
+                        badgeBorder: 'border-red-500',
+                        badgeText: 'text-red-300',
+                        cardBg: 'bg-red-950/35',
+                        cardBorder: 'border-red-500/40',
+                        titleColor: 'text-red-300'
+                    };
+                case 'pen_miss':
+                    return {
+                        icon: '❌',
+                        badgeBg: 'bg-rose-950',
+                        badgeBorder: 'border-rose-500/50',
+                        badgeText: 'text-rose-300',
+                        cardBg: 'bg-rose-950/25',
+                        cardBorder: 'border-rose-500/30',
+                        titleColor: 'text-rose-300'
+                    };
+                case 'save':
+                    return {
+                        icon: '🧤',
+                        badgeBg: 'bg-sky-950',
+                        badgeBorder: 'border-sky-500/40',
+                        badgeText: 'text-sky-300',
+                        cardBg: 'bg-pitch-950/70',
+                        cardBorder: 'border-slate-800',
+                        titleColor: 'text-sky-300'
+                    };
+                case 'woodwork':
+                    return {
+                        icon: '🥅',
+                        badgeBg: 'bg-purple-950',
+                        badgeBorder: 'border-purple-500/40',
+                        badgeText: 'text-purple-300',
+                        cardBg: 'bg-pitch-950/70',
+                        cardBorder: 'border-slate-800',
+                        titleColor: 'text-purple-300'
+                    };
+                case 'whistle':
+                    return {
+                        icon: '📣',
+                        badgeBg: 'bg-slate-800',
+                        badgeBorder: 'border-slate-600',
+                        badgeText: 'text-slate-200',
+                        cardBg: 'bg-slate-800/45',
+                        cardBorder: 'border-slate-700',
+                        titleColor: 'text-white'
+                    };
+                default:
+                    return {
+                        icon: '⚡',
+                        badgeBg: 'bg-pitch-950',
+                        badgeBorder: 'border-slate-700',
+                        badgeText: 'text-slate-300',
+                        cardBg: 'bg-pitch-950/60',
+                        cardBorder: 'border-slate-800/90',
+                        titleColor: 'text-slate-200'
+                    };
+            }
+        }
+
+        /**
+         * Tüm Maç Raporunu Panoya Kopyalar (iFrame uyumlu execCommand ile)
+         */
+        function copyFullMatchReport() {
+            if (!state.lastSimulation) return;
+            const sim = state.lastSimulation;
+
+            let lines = [
+                `🏟️ MAÇ RAPORU: Ev Sahibi Takım (Sv.${sim.homeLvl}) ${sim.stats.home.goals} - ${sim.stats.away.goals} Deplasman Takımı (Sv.${sim.awayLvl})`,
+                `İlk Yarı: ${sim.stats.home.htGoals} - ${sim.stats.away.htGoals}`
+            ];
+
+            if (sim.penaltyData) {
+                lines.push(`Seri Penaltılar: ${sim.penaltyData.homeScore} - ${sim.penaltyData.awayScore} (Kazanan: ${sim.penaltyData.winner === 'home' ? 'Ev Sahibi Takım' : 'Deplasman Takımı'})`);
+            }
+
+            lines.push(
+                ``,
+                `📊 İSTATİSTİKLER:`,
+                `Topla Oynama: %${sim.stats.home.possession} - %${sim.stats.away.possession}`,
+                `Şut (İsabetli): ${sim.stats.home.shots} (${sim.stats.home.onTarget}) - ${sim.stats.away.shots} (${sim.stats.away.onTarget})`,
+                `Korner: ${sim.stats.home.corners} - ${sim.stats.away.corners}`,
+                `Kartlar (Sarı/Kırmızı): ${sim.stats.home.yellow}/${sim.stats.home.red} - ${sim.stats.away.yellow}/${sim.stats.away.red}`,
+                ``,
+                `🎙️ MAÇ OLAYLARI:`
+            );
+
+            sim.events.forEach(e => {
+                lines.push(`[${e.displayMin}] ${e.title} -> ${e.desc}`);
+            });
+
+            const textArea = document.createElement('textarea');
+            textArea.value = lines.join('\n');
+            textArea.style.position = 'fixed';
+            textArea.style.left = '-9999px';
+            document.body.appendChild(textArea);
+            textArea.select();
+
+            try {
+                document.execCommand('copy');
+                showToast('Tüm maç raporu ve olaylar panoya kopyalandı!');
+            } catch (err) {
+                showToast('Kopyalama sırasında bir hata oluştu.', true);
+            }
+            document.body.removeChild(textArea);
+        }
+
+        /**
+         * Uygulamayı Başlangıç Durumuna Sıfırlar
+         */
+        function resetAll() {
+            state.homeLevel = 7;
+            state.awayLevel = 6;
+            state.matchMode = 'normal';
+            state.lastSimulation = null;
+
+            updateTeamCardsUI();
+            setMatchMode('normal');
+
+            document.getElementById('results-wrapper').classList.add('hidden');
+            document.getElementById('empty-state').classList.remove('hidden');
+            showToast('Simülatör ayarları sıfırlandı.');
+        }
+
+        /**
+         * Özel Bildirim Balonu (alert() yerine kullanılır)
+         */
+        function showToast(message, isError = false) {
+            const container = document.getElementById('toast-container');
+            const toast = document.createElement('div');
+            toast.className = `pointer-events-auto px-4 py-3 rounded-xl shadow-2xl border text-xs sm:text-sm font-semibold flex items-center gap-2 transition-all duration-300 transform translate-y-2 opacity-0 ${
+                isError
+                    ? 'bg-rose-950/95 border-rose-500/50 text-rose-200'
+                    : 'bg-slate-900/95 border-emerald-500/50 text-emerald-200'
+            }`;
+            toast.innerHTML = `<span>${isError ? '⚠️' : '✅'}</span><span>${message}</span>`;
+            container.appendChild(toast);
+
+            requestAnimationFrame(() => {
+                toast.classList.remove('translate-y-2', 'opacity-0');
+            });
+
+            setTimeout(() => {
+                toast.classList.add('translate-y-2', 'opacity-0');
+                setTimeout(() => toast.remove(), 300);
+            }, 3000);
+        }
+    </script>
+</body>
+</html>
+```
